@@ -8,6 +8,9 @@ RUN apt-get update && \
  apt-get install -y --no-install-recommends wireguard-tools iptables nano net-tools procps openresolv inotify-tools && \
  apt-get clean
 
+# Remove net.ipv4.conf.all.src_valid_mark from wg-quick to prevent error
+RUN sed -i '/net.ipv4.conf.all.src_valid_mark=1/d' /usr/bin/wg-quick
+
 # Add main work dir to PATH
 WORKDIR /scripts
 ENV PATH="/scripts:${PATH}"
