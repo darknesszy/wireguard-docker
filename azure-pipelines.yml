@@ -1,0 +1,64 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  branches:
+    include:
+    - master
+pr: none
+
+variables:
+- name: registry
+  value: registry.cn-shenzhen.aliyuncs.com
+- name: repo
+  value: kfntech/wireguard
+- name: tag
+  value: test
+
+stages:
+- stage: Build
+  jobs:
+  - job:
+    pool:
+      vmImage: 'debian-bullseye'
+    steps:
+    - task: Docker@2
+      inputs:
+        command: 'build'
+        Dockerfile: '$(System.DefaultWorkingDirectory)/Dockerfile'
+        addPipelineData: false
+        buildContext: '$(System.DefaultWorkingDirectory)'
+        arguments: '-t $(registry)/$(repo):$(Build.BuildId)'
+      continueOnError: false
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(Pipeline.Workspace)/dockerimage.tar'
+        artifact: 'docker-image'
+        publishLocation: 'pipeline'
+- stage: Push
+  jobs:
+  - job:
+    pool:
+      vmImage: 'debian-bullseye'
+    steps:
+    - task: DownloadPipelineArtifact@2
+      inputs:
+        buildType: 'current'
+        artifactName: 'docker-image'
+        targetPath: '$(Pipeline.Workspace)'
+    - script: |
+        docker load --input $(Pipeline.Workspace)/dockerimage.tar
+        docker tag $(registry)/$(repo):$(Build.BuildId) $(registry)/$(repo):$(tag)
+      displayName: Artifact to Docker Image
+      continueOnError: false
+    - task: Docker@2
+      inputs:
+        containerRegistry: '$(registry)'
+        repository: $(repo)
+        command: 'push'
+        addPipelineData: false
+        tags: |
+          $(Build.BuildId)
+          $(tag)
